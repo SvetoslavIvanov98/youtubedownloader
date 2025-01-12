@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <style>
+        /* Make html and body take full height */
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center; /* Center the content horizontally */
+            align-items: center;     /* Center the content vertically */
+            text-align: center;
+            background-image: url('static/background.jpg'); /* Test with an online image */
+            background-size: cover; /* Make the background image cover the entire screen */
+            background-position: center; /* Center the background image */
+            background-attachment: fixed; /* Keep the background fixed while scrolling */
+            color: white; /* Make text color white to contrast with the background */
+        }
+
+        form {
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black background for form */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 600px; /* Limit the maximum width of the form */
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Add text shadow for better visibility */
+        }
+
+        label {
+            font-size: 18px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 80%;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: rgba(255, 255, 255, 0.8); /* Slightly transparent white background */
+        }
+
+        input[type="submit"] {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #45a049; /* Change background on hover */
+        }
+
+        #progress-container {
+            display: none;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        #progress-bar {
+            width: 0;
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 5px;
+        }
+
+        #progress-text {
+            margin-top: 10px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>YouTube Video Downloader</h1>
+
+<!-- Form to send the POST request to /download -->
+<form id="download-form" action="/download" method="POST">
+    <label for="video_url">YouTube Video URL:</label><br>
+    <input type="text" id="video_url" name="video_url" placeholder="Enter the YouTube video URL" required><br><br>
+
+    <input type="submit" value="Download Video">
+</form>
+
+<div id="progress-container">
+    <div id="progress-bar"></div>
+    <div id="progress-text">0%</div>
+</div>
+
+<script>
+    document.getElementById('download-form').addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent the default form submission
+        startDownload();
+    });
+
+    function startDownload() {
+        document.getElementById('progress-container').style.display = 'block';
+        pollProgress();
+
+        // Submit the form via AJAX
+        const formData = new FormData(document.getElementById('download-form'));
+        fetch('/download', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.blob())
+          .then(blob => {
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.style.display = 'none';
+              a.href = url;
+              a.download = 'video.mp4'; // You can set the file name here
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+          })
+          .catch(error => console.error('Error:', error));
+    }
+
+    function pollProgress() {
+        fetch('/progress')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Progress data:', data); // Log progress data to console
+                const progressBar = document.getElementById('progress-bar');
+                const progressText = document.getElementById('progress-text');
+                progressBar.style.width = data.progress + '%';
+                progressText.textContent = data.progress + '%';
+
+                if (data.status === 'downloading') {
+                    setTimeout(pollProgress, 1000);
+                } else if (data.status === 'finished') {
+                    progressText.textContent = 'Download complete!';
+                }
+            })
+            .catch(error => console.error('Error fetching progress:', error));
+    }
+</script>
+
+</body>
+</html>
