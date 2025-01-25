@@ -24,7 +24,7 @@ def download():
 
     # yt-dlp options to fetch the best video and audio
     ydl_opts = {
-        'format': 'bestvideo+bestaudio/best',  # Download the best video and audio
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',  # Download the best video and audio with height <= 1080
         'outtmpl': f'{download_folder}/%(title)s.%(ext)s',  # Save with video title
         'quiet': True,  # Suppress output except errors
         'geo_bypass': True,  # Bypass geographical restrictions

@@ -17,3 +17,5 @@ EXPOSE 5000
 # Step 6: Run the Flask app when the container starts
 CMD ["python", "ytdownloaderweb.py"]
 
+# Step 7: Install ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg
