@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
 import yt_dlp
 import os
-import shutil
+import re
 
 app = Flask(__name__)
 progress = {'status': 'idle', 'progress': 0}
@@ -22,31 +22,33 @@ def download():
     if not os.path.exists(download_folder):
         os.makedirs(download_folder)
 
-    # yt-dlp options to fetch the best video or audio (no merging)
+    # yt-dlp options to fetch the best video and audio
     ydl_opts = {
-        'format': 'bestvideo',  # Download the best video only
+        'format': 'bestvideo+bestaudio/best',  # Download the best video and audio
         'outtmpl': f'{download_folder}/%(title)s.%(ext)s',  # Save with video title
         'quiet': True,  # Suppress output except errors
-        'cookiefile': 'cookies.txt',  # Path to the cookies.txt file
-        'headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://www.youtube.com/',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,pl;q=0.7'
-        },
         'geo_bypass': True,  # Bypass geographical restrictions
-        'progress_hooks': [progress_hook]  # Add progress hook
+        'merge_output_format': 'mp4',  # Ensure the output format is mp4
+        'progress_hooks': [progress_hook],  # Add progress hook
+        'cookiefile': 'cookies.txt',  # Use cookies from cookies.txt
+        'http_headers': {  # Add common headers to mimic a real browser
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.youtube.com/',  # Add Referer header
+        },
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Extract video info and download it
             info_dict = ydl.extract_info(video_url, download=True)
-            video_file = f"{download_folder}/{info_dict['title']}.{info_dict['ext']}"  # Get file path
+            print(f"Info dict: {info_dict}")  # Debug print
+            video_file = f"{download_folder}/{info_dict['title']}.mp4"  # Get file path
+            print(f"Video file path: {video_file}")  # Debug print
 
         # Return the file as a download response
         response = send_file(video_file, as_attachment=True)
+        response.headers["Content-Disposition"] = f"attachment; filename={os.path.basename(video_file)}"
 
         # After sending the file, delete the video file from the folder
         os.remove(video_file)
@@ -54,6 +56,11 @@ def download():
         return response
 
     except Exception as e:
+        print(f"Error: {str(e)}")  # Debug print
+        # Clean up any .part files
+        for file in os.listdir(download_folder):
+            if file.endswith('.part'):
+                os.remove(os.path.join(download_folder, file))
         return f"Error: {str(e)}"
 
 @app.route('/progress')
@@ -64,8 +71,10 @@ def progress_status():
 def progress_hook(d):
     global progress
     if d['status'] == 'downloading':
+        # Remove ANSI escape codes
+        percent_str = re.sub(r'\x1b\[[0-9;]*m', '', d['_percent_str']).strip('%')
         progress['status'] = 'downloading'
-        progress['progress'] = float(d['_percent_str'].strip('%'))
+        progress['progress'] = float(percent_str)
         print(f"Downloading: {progress['progress']}%")
     elif d['status'] == 'finished':
         progress['status'] = 'finished'
