@@ -12,10 +12,10 @@ def index():
     return render_template('index.html')
 
 @app.route('/download', methods=['POST'])
-def download():
+def download_video():
     global progress
     progress = {'status': 'idle', 'progress': 0}  # Reset progress
-    video_url = request.form['video_url']
+    url = request.form['url']
     download_folder = "downloads"
 
     # Ensure the download folder exists
@@ -25,7 +25,7 @@ def download():
     # yt-dlp options to fetch the best video and audio
     ydl_opts = {
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',  # Download the best video and audio with height <= 1080
-        'outtmpl': f'{download_folder}/%(title)s.%(ext)s',  # Save with video title
+        'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),  # Save with video title
         'quiet': True,  # Suppress output except errors
         'geo_bypass': True,  # Bypass geographical restrictions
         'merge_output_format': 'mp4',  # Ensure the output format is mp4
@@ -41,19 +41,11 @@ def download():
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Extract video info and download it
-            info_dict = ydl.extract_info(video_url, download=True)
-            print(f"Info dict: {info_dict}")  # Debug print
-            video_file = f"{download_folder}/{info_dict['title']}.mp4"  # Get file path
-            print(f"Video file path: {video_file}")  # Debug print
-
-        # Return the file as a download response
-        response = send_file(video_file, as_attachment=True)
-        response.headers["Content-Disposition"] = f"attachment; filename={os.path.basename(video_file)}"
-
-        # After sending the file, delete the video file from the folder
-        os.remove(video_file)
-
-        return response
+            info_dict = ydl.extract_info(url, download=True)
+            video_title = info_dict.get('title', None)
+            video_ext = info_dict.get('ext', None)
+            video_filename = f"{video_title}.{video_ext}"
+            return send_file(os.path.join(download_folder, video_filename), as_attachment=True)
 
     except Exception as e:
         print(f"Error: {str(e)}")  # Debug print
